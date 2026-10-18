@@ -1,7 +1,7 @@
 <div align="center">
 
 # 🎙️ **Registratore Vocale** 🚀
-<img src="app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" alt="Icona Registratore Vocale" width="120" height="120" />
+<img src="app/src/main/res/mipmap-xxhdpi/ic_launcher.png" alt="Icona Registratore Vocale" width="120" height="120" />
 
 ### *App Android per la Registrazione Audio con Interfaccia Moderna*
 
