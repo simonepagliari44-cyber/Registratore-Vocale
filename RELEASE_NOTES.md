@@ -49,7 +49,7 @@
 |-----------|--------|
 | **Version Code** | 1 |
 | **Version Name** | 1.0 |
-| **Min SDK** | 24 (Android 7.0) |
+| **Min SDK** | 26 (Android 8.0) |
 | **Target SDK** | 34 (Android 14) |
 | **Kotlin** | 2.2.21 |
 | **Compose BOM** | 2024.09.03 |

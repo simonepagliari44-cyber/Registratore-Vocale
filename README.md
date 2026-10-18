@@ -1,6 +1,7 @@
 <div align="center">
 
 # 🎙️ **Registratore Vocale** 🚀
+<img src="docs/icon.svg" alt="Icona Registratore Vocale" width="120" height="120" />
 
 ### *App Android per la Registrazione Audio con Interfaccia Moderna*
 
@@ -35,7 +36,7 @@ L'app sfrutta le potenzialità di **Jetpack Compose** per garantire un'interfacc
 | **Linguaggio** | Kotlin 2.2.21 |
 | **UI Framework** | Jetpack Compose + Material 3 |
 | **Architettura** | MVVM (Model-View-ViewModel) |
-| **Min SDK** | Android 7.0 (API 24) |
+| **Min SDK** | Android 8.0 (API 26) |
 | **Target SDK** | Android 14 (API 34) |
 | **Build System** | Gradle 8.14.3 (Kotlin DSL) |
 
@@ -73,7 +74,7 @@ app/src/main/java/com/simonecompany/registratorevocale/
 
 3. Sincronizza il progetto Gradle e avvia la build.
 
-4. Installa l'APK su un dispositivo o emulatore con API 24+.
+4. Installa l'APK su un dispositivo o emulatore con API 26+.
 
 ---
 
