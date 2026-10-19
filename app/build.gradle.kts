@@ -59,5 +59,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
 
+    implementation("androidx.media:media:1.7.0")
+
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

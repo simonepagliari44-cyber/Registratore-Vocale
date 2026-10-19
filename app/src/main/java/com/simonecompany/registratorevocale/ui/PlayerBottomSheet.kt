@@ -1,6 +1,11 @@
 package com.simonecompany.registratorevocale.ui
 
-import android.media.MediaPlayer
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,19 +23,17 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.simonecompany.registratorevocale.model.Recording
-import kotlinx.coroutines.delay
+import com.simonecompany.registratorevocale.service.PlaybackController
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,49 +43,30 @@ fun PlayerBottomSheet(
     recording: Recording,
     onClose: () -> Unit
 ) {
-    var isPlaying by remember { mutableStateOf(false) }
-    var position by remember { mutableFloatStateOf(0f) }
-    var duration by remember { mutableFloatStateOf(1f) }
-
     val context = LocalContext.current
-    val player = remember { MediaPlayer() }
 
-    DisposableEffect(recording) {
-        onDispose {
-            runCatching { player.stop() }
-            runCatching { player.release() }
-        }
-    }
+    val current by PlaybackController.current.collectAsState()
+    val ctrlPlaying by PlaybackController.isPlaying.collectAsState()
+    val ctrlPosition by PlaybackController.positionMs.collectAsState()
+    val ctrlDuration by PlaybackController.durationMs.collectAsState()
 
-    LaunchedEffect(recording) {
-        position = 0f
-        isPlaying = false
-        runCatching { player.stop() }
-        runCatching { player.reset() }
-        runCatching {
-            player.setDataSource(context, recording.uri)
-            player.prepare()
-            duration = player.duration.toFloat().coerceAtLeast(1f)
-        }
-    }
+    val active = current?.uri == recording.uri
+    val isPlaying = active && ctrlPlaying
+    val position = if (active) ctrlPosition else 0L
+    val duration = (if (active && ctrlDuration > 0) ctrlDuration else recording.durationMillis)
+        .coerceAtLeast(1L)
 
-    fun togglePlay() {
-        if (isPlaying) {
-            runCatching { player.pause() }
-        } else {
-            runCatching { player.start() }
-        }
-        isPlaying = !isPlaying
-    }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {}
 
-    LaunchedEffect(isPlaying) {
-        while (isPlaying) {
-            runCatching { position = player.currentPosition.toFloat() }
-            if (position >= duration) {
-                isPlaying = false
-                runCatching { player.pause() }
-            }
-            delay(100)
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.POST_NOTIFICATIONS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -115,22 +99,37 @@ fun PlayerBottomSheet(
         Spacer(Modifier.height(20.dp))
 
         LinearProgressIndicator(
-            progress = { (position / duration).coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth()
+            progress = { (position.toFloat() / duration).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(duration) {
+                    detectTapGestures { offset ->
+                        if (active) {
+                            val fraction = (offset.x / size.width).coerceIn(0f, 1f)
+                            PlaybackController.seekTo((fraction * duration).toLong())
+                        }
+                    }
+                }
         )
 
         Spacer(Modifier.height(4.dp))
 
         Row(modifier = Modifier.fillMaxWidth()) {
-            Text(formatMillis(position.toLong()), style = MaterialTheme.typography.labelSmall)
+            Text(formatMillis(position), style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.weight(1f))
-            Text(formatMillis(duration.toLong()), style = MaterialTheme.typography.labelSmall)
+            Text(formatMillis(duration), style = MaterialTheme.typography.labelSmall)
         }
 
         Spacer(Modifier.height(8.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = { togglePlay() }) {
+            IconButton(onClick = {
+                if (isPlaying) {
+                    PlaybackController.pause(context)
+                } else {
+                    PlaybackController.play(context, recording)
+                }
+            }) {
                 Icon(
                     if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                     contentDescription = "Play/Pause",
@@ -138,10 +137,7 @@ fun PlayerBottomSheet(
                 )
             }
             IconButton(onClick = {
-                isPlaying = false
-                runCatching { player.pause() }
-                runCatching { player.seekTo(0) }
-                position = 0f
+                if (active) PlaybackController.stop(context)
             }) {
                 Icon(Icons.Default.Stop, contentDescription = "Stop",
                     modifier = Modifier.size(40.dp))

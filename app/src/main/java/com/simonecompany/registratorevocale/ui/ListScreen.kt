@@ -131,12 +131,12 @@ private fun SwipeToDismiss(
 ) {
     val state = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.StartToEnd) {
+            if (value == SwipeToDismissBoxValue.StartToEnd ||
+                value == SwipeToDismissBoxValue.EndToStart
+            ) {
                 onDelete(recording)
-                true
-            } else {
-                false
             }
+            false
         }
     )
 
@@ -165,17 +165,18 @@ private fun SwipeToDismiss(
     SwipeToDismissBox(
         state = state,
         backgroundContent = {
+            val fromEnd = state.dismissDirection == SwipeToDismissBoxValue.EndToStart
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(backgroundColor),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = if (fromEnd) Alignment.CenterEnd else Alignment.CenterStart
             ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Elimina",
                     modifier = Modifier
-                        .padding(start = 24.dp)
+                        .padding(horizontal = 24.dp)
                         .size(36.dp)
                         .graphicsLayer {
                             alpha = (0.3f + 0.7f * progress).coerceIn(0f, 1f)

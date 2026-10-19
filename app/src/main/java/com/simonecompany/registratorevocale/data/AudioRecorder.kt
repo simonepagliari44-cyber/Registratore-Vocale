@@ -22,8 +22,12 @@ class AudioRecorder(private val context: Context) {
     private var pendingPfd: ParcelFileDescriptor? = null
     var isRecording: Boolean = false
         private set
+    var isPaused: Boolean = false
+        private set
     var startTime: Long = 0L
         private set
+    private var pausedTotalMs = 0L
+    private var pauseStartTime = 0L
 
     fun start(): Boolean {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
@@ -87,13 +91,51 @@ class AudioRecorder(private val context: Context) {
 
         recorder = r
         isRecording = true
+        isPaused = false
+        pausedTotalMs = 0L
+        pauseStartTime = 0L
         startTime = System.currentTimeMillis()
         return true
     }
 
+    fun pause(): Boolean {
+        val r = recorder ?: return false
+        if (!isRecording || isPaused) return false
+        return try {
+            r.pause()
+            isPaused = true
+            pauseStartTime = System.currentTimeMillis()
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun resume(): Boolean {
+        val r = recorder ?: return false
+        if (!isRecording || !isPaused) return false
+        return try {
+            r.resume()
+            pausedTotalMs += System.currentTimeMillis() - pauseStartTime
+            pauseStartTime = 0L
+            isPaused = false
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    fun elapsedMillis(): Long {
+        if (startTime == 0L) return 0L
+        val end = if (isPaused) pauseStartTime else System.currentTimeMillis()
+        return (end - startTime - pausedTotalMs).coerceAtLeast(0L)
+    }
+
     fun stop(): Recording? {
         val uri = currentUri
-        val durationMillis = if (startTime > 0) System.currentTimeMillis() - startTime else 0L
+        val endRef = if (isPaused) pauseStartTime else System.currentTimeMillis()
+        val durationMillis =
+            if (startTime > 0) (endRef - startTime - pausedTotalMs).coerceAtLeast(0L) else 0L
 
         try {
             recorder?.let {
@@ -109,6 +151,9 @@ class AudioRecorder(private val context: Context) {
         runCatching { pendingPfd?.close() }
         pendingPfd = null
         isRecording = false
+        isPaused = false
+        pausedTotalMs = 0L
+        pauseStartTime = 0L
 
         if (uri != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.simonecompany.registratorevocale.data.AudioRecorder
 import com.simonecompany.registratorevocale.model.Recording
@@ -52,6 +55,7 @@ fun RecordScreen(
     onRecordingSaved: (Recording) -> Unit
 ) {
     var isRecording by remember { mutableStateOf(recorder.isRecording) }
+    var isPaused by remember { mutableStateOf(recorder.isPaused) }
     var elapsed by remember { mutableFloatStateOf(0f) }
     var wavePhase by remember { mutableFloatStateOf(0f) }
 
@@ -66,9 +70,9 @@ fun RecordScreen(
         label = "phase"
     )
 
-    LaunchedEffect(isRecording) {
-        while (isRecording) {
-            elapsed = ((System.currentTimeMillis() - recorder.startTime) / 1000f)
+    LaunchedEffect(isRecording, isPaused) {
+        while (isRecording && !isPaused) {
+            elapsed = recorder.elapsedMillis() / 1000f
             wavePhase = phase
             delay(100)
         }
@@ -95,29 +99,68 @@ fun RecordScreen(
             Spacer(Modifier.height(16.dp))
 
             WaveformBar(
-                active = isRecording,
+                active = isRecording && !isPaused,
                 phase = wavePhase,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(80.dp)
             )
 
+            if (isPaused) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "In pausa",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             Spacer(Modifier.height(40.dp))
 
-            RecordButton(
-                isRecording = isRecording,
-                onClick = {
-                    if (isRecording) {
-                        recorder.stop()?.let { onRecordingSaved(it) }
-                        isRecording = false
-                    } else {
-                        recorder.start()
-                        elapsed = 0f
-                        isRecording = true
-                        onRecordingStarted()
+            if (!isRecording) {
+                RecordButton(
+                    onClick = {
+                        if (recorder.start()) {
+                            elapsed = 0f
+                            isPaused = false
+                            isRecording = true
+                            onRecordingStarted()
+                        }
                     }
+                )
+            } else {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(32.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ControlButton(
+                        icon = if (isPaused) Icons.Default.PlayArrow else Icons.Default.Pause,
+                        contentDescription = if (isPaused) "Riprendi" else "Pausa",
+                        container = MaterialTheme.colorScheme.primary,
+                        onClick = {
+                            if (isPaused) {
+                                if (recorder.resume()) isPaused = false
+                            } else {
+                                if (recorder.pause()) {
+                                    elapsed = recorder.elapsedMillis() / 1000f
+                                    isPaused = true
+                                }
+                            }
+                        }
+                    )
+                    ControlButton(
+                        icon = Icons.Default.Stop,
+                        contentDescription = "Stop",
+                        container = MaterialTheme.colorScheme.error,
+                        onClick = {
+                            recorder.stop()?.let { onRecordingSaved(it) }
+                            isRecording = false
+                            isPaused = false
+                            elapsed = 0f
+                        }
+                    )
                 }
-            )
+            }
         }
     }
 }
@@ -130,20 +173,43 @@ private fun formatTime(seconds: Float): String {
 }
 
 @Composable
-private fun RecordButton(isRecording: Boolean, onClick: () -> Unit) {
+private fun RecordButton(onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(120.dp)
             .clip(CircleShape)
-            .background(if (isRecording) MaterialTheme.colorScheme.error
-                else MaterialTheme.colorScheme.primary)
+            .background(MaterialTheme.colorScheme.primary)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Icon(
-            imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.PlayArrow,
-            contentDescription = if (isRecording) "Stop" else "Registra",
+            imageVector = Icons.Default.PlayArrow,
+            contentDescription = "Registra",
             modifier = Modifier.size(56.dp),
+            tint = Color.White
+        )
+    }
+}
+
+@Composable
+private fun ControlButton(
+    icon: ImageVector,
+    contentDescription: String,
+    container: Color,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(96.dp)
+            .clip(CircleShape)
+            .background(container)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(44.dp),
             tint = Color.White
         )
     }
