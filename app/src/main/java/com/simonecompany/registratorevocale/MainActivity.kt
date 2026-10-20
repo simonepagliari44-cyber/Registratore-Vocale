@@ -2,6 +2,7 @@ package com.simonecompany.registratorevocale
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,6 +68,20 @@ class MainViewModel(
             recordings.value = repository.getRecordings()
         }
     }
+
+    fun toggleFavorite(recording: Recording) {
+        viewModelScope.launch {
+            repository.setFavorite(recording, !recording.favorite)
+            recordings.value = repository.getRecordings()
+        }
+    }
+
+    fun rename(recording: Recording, newName: String) {
+        viewModelScope.launch {
+            repository.rename(recording, newName)
+            recordings.value = repository.getRecordings()
+        }
+    }
 }
 
 class MainActivity : ComponentActivity() {
@@ -112,19 +127,32 @@ fun MainApp(
     val context = LocalContext.current
     val recorder = remember { AudioRecorder(context.applicationContext) }
 
+    val requiredPermissions = remember {
+        buildList {
+            add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                add(Manifest.permission.READ_EXTERNAL_STORAGE)
+            }
+        }
+    }
+
     val hasPermission = remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
+            requiredPermissions.all {
+                ContextCompat.checkSelfPermission(context, it) ==
+                    PackageManager.PERMISSION_GRANTED
+            }
         )
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasPermission.value = granted
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        hasPermission.value = requiredPermissions.all {
+            ContextCompat.checkSelfPermission(context, it) ==
+                PackageManager.PERMISSION_GRANTED
+        }
     }
 
     val recordings by viewModel.recordings
@@ -141,7 +169,11 @@ fun MainApp(
         ) {
             PlayerBottomSheet(
                 recording = recording,
-                onClose = { playbackRecording = null }
+                onClose = { playbackRecording = null },
+                onRename = { newName ->
+                    viewModel.rename(recording, newName)
+                    playbackRecording = null
+                }
             )
         }
     }
@@ -169,7 +201,7 @@ fun MainApp(
                 0 -> {
                     if (!hasPermission.value) {
                         PermissionRequest(onRequest = {
-                            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                            permissionLauncher.launch(requiredPermissions.toTypedArray())
                         })
                     } else {
                         RecordScreen(
@@ -183,6 +215,7 @@ fun MainApp(
                 1 -> ListScreen(
                     recordings = recordings,
                     onDelete = { viewModel.delete(it) },
+                    onToggleFavorite = { viewModel.toggleFavorite(it) },
                     onOpenPlayer = { playbackRecording = it }
                 )
             }

@@ -29,7 +29,7 @@ class AudioRecorder(private val context: Context) {
     private var pausedTotalMs = 0L
     private var pauseStartTime = 0L
 
-    fun start(): Boolean {
+    fun start(quality: AudioQuality = AudioQuality.MEDIUM): Boolean {
         val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
         val fileName = "record_$timestamp.m4a"
 
@@ -44,8 +44,8 @@ class AudioRecorder(private val context: Context) {
             setAudioSource(MediaRecorder.AudioSource.MIC)
             setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setAudioEncodingBitRate(128000)
-            setAudioSamplingRate(44100)
+            setAudioEncodingBitRate(quality.bitRate)
+            setAudioSamplingRate(quality.samplingRate)
         }
 
         try {
@@ -129,6 +129,11 @@ class AudioRecorder(private val context: Context) {
         if (startTime == 0L) return 0L
         val end = if (isPaused) pauseStartTime else System.currentTimeMillis()
         return (end - startTime - pausedTotalMs).coerceAtLeast(0L)
+    }
+
+    fun currentAmplitude(): Int {
+        if (!isRecording || isPaused) return 0
+        return runCatching { recorder?.maxAmplitude ?: 0 }.getOrDefault(0)
     }
 
     fun stop(): Recording? {

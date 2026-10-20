@@ -33,6 +33,29 @@ object StorageHelper {
         }
     }
 
+    fun rename(context: Context, recording: Recording, newName: String): String? {
+        val cleaned = newName.trim().trimEnd('.')
+        if (cleaned.isEmpty()) return null
+        val target = if (cleaned.endsWith(".m4a", true)) cleaned else "$cleaned.m4a"
+        if (target == recording.name) return null
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val values = ContentValues().apply {
+                put(MediaStore.Audio.Media.DISPLAY_NAME, target)
+            }
+            val updated = context.contentResolver.update(recording.uri, values, null, null)
+            if (updated > 0) target else null
+        } else {
+            val oldFile = recording.uri.path?.let { File(it) }
+            if (oldFile != null && oldFile.exists()) {
+                val newFile = File(oldFile.parentFile, target)
+                if (oldFile.renameTo(newFile)) target else null
+            } else {
+                null
+            }
+        }
+    }
+
     fun legacyDirectory(context: Context): File {
         val dir = File(
             Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),

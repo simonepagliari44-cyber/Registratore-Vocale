@@ -7,5 +7,6 @@ data class Recording(
     val name: String,
     val uri: Uri,
     val durationMillis: Long,
-    val createdAt: Long
+    val createdAt: Long,
+    val favorite: Boolean = false
 )
